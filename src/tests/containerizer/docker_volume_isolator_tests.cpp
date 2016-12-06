@@ -874,8 +874,11 @@ TEST_F(DockerVolumeIsolatorTest,
 
   Image image;
   image.set_type(Image::DOCKER);
+  #if defined(__s390x__)
+  image.mutable_docker()->set_name("s390x/debian");
+  #else
   image.mutable_docker()->set_name("alpine");
-
+  #endif
   ContainerInfo containerInfo;
   containerInfo.set_type(ContainerInfo::MESOS);
   containerInfo.add_volumes()->CopyFrom(volume);
@@ -1014,8 +1017,11 @@ TEST_F(DockerVolumeIsolatorTest,
 
   Image image;
   image.set_type(Image::DOCKER);
+  #if defined(__s390x__)
+  image.mutable_docker()->set_name("s390x/debian");
+  #else
   image.mutable_docker()->set_name("alpine");
-
+  #endif
   ContainerInfo containerInfo;
   containerInfo.set_type(ContainerInfo::MESOS);
   containerInfo.add_volumes()->CopyFrom(volume);
