@@ -85,10 +85,17 @@ namespace tests {
  * @param os Operating system(e.g, linux).
  * @return Appc protobuff message object.
  */
+#if defined(__s390x__)
+static Image::Appc getAppcImage(
+    const string& name,
+    const string& arch = "s390x",
+    const string& os = "linux")
+#else
 static Image::Appc getAppcImage(
     const string& name,
     const string& arch = "amd64",
     const string& os = "linux")
+#endif
 {
   Image::Appc appc;
   appc.set_name(name);
@@ -108,6 +115,105 @@ static Image::Appc getAppcImage(
   appc.mutable_labels()->CopyFrom(labels);
 
   return appc;
+}
+
+
+// TODO(jojy): Move AppcSpecTest to its own test file.
+class AppcSpecTest : public TemporaryDirectoryTest {};
+
+
+TEST_F(AppcSpecTest, ValidateImageManifest)
+{
+#if defined(__s390x__)
+  JSON::Value manifest = JSON::parse(
+      "{"
+      "  \"acKind\": \"ImageManifest\","
+      "  \"acVersion\": \"0.6.1\","
+      "  \"name\": \"foo.com/bar\","
+      "  \"labels\": ["
+      "    {"
+      "      \"name\": \"version\","
+      "      \"value\": \"1.0.0\""
+      "    },"
+      "    {"
+      "      \"name\": \"arch\","
+      "      \"value\": \"s390x\""
+      "    },"
+      "    {"
+      "      \"name\": \"os\","
+      "      \"value\": \"linux\""
+      "    }"
+      "  ],"
+      "  \"annotations\": ["
+      "    {"
+      "      \"name\": \"created\","
+      "      \"value\": \"1438983392\""
+      "    }"
+      "  ]"
+      "}").get();
+
+#else
+  JSON::Value manifest = JSON::parse(
+      "{"
+      "  \"acKind\": \"ImageManifest\","
+      "  \"acVersion\": \"0.6.1\","
+      "  \"name\": \"foo.com/bar\","
+      "  \"labels\": ["
+      "    {"
+      "      \"name\": \"version\","
+      "      \"value\": \"1.0.0\""
+      "    },"
+      "    {"
+      "      \"name\": \"arch\","
+      "      \"value\": \"amd64\""
+      "    },"
+      "    {"
+      "      \"name\": \"os\","
+      "      \"value\": \"linux\""
+      "    }"
+      "  ],"
+      "  \"annotations\": ["
+      "    {"
+      "      \"name\": \"created\","
+      "      \"value\": \"1438983392\""
+      "    }"
+      "  ]"
+      "}").get();
+#endif
+  EXPECT_SOME(spec::parse(stringify(manifest)));
+
+  // Incorrect acKind for image manifest.
+  manifest = JSON::parse(
+      "{"
+      "  \"acKind\": \"PodManifest\","
+      "  \"acVersion\": \"0.6.1\","
+      "  \"name\": \"foo.com/bar\""
+      "}").get();
+
+  EXPECT_ERROR(spec::parse(stringify(manifest)));
+}
+
+
+TEST_F(AppcSpecTest, ValidateLayout)
+{
+  string image = os::getcwd();
+
+  JSON::Value manifest = JSON::parse(
+      "{"
+      "  \"acKind\": \"ImageManifest\","
+      "  \"acVersion\": \"0.6.1\","
+      "  \"name\": \"foo.com/bar\""
+      "}").get();
+
+  ASSERT_SOME(os::write(path::join(image, "manifest"), stringify(manifest)));
+
+  // Missing rootfs.
+  EXPECT_SOME(spec::validateLayout(image));
+
+  ASSERT_SOME(os::mkdir(path::join(image, "rootfs", "tmp")));
+  ASSERT_SOME(os::write(path::join(image, "rootfs", "tmp", "test"), "test"));
+
+  EXPECT_NONE(spec::validateLayout(image));
 }
 
 
@@ -191,8 +297,11 @@ protected:
 
     Label arch;
     arch.set_key("arch");
+    #if defined(__s390x__)
+    arch.set_value("s390x");
+    #else
     arch.set_value("amd64");
-
+    #endif
     Label os;
     os.set_key("os");
     os.set_value("linux");
@@ -211,6 +320,35 @@ protected:
   // ability for customizing manifests for fixtures.
   virtual JSON::Value getManifest() const
   {
+  #if defined(__s390x__)
+    return JSON::parse(
+        R"~(
+        {
+          "acKind": "ImageManifest",
+          "acVersion": "0.6.1",
+          "name": "foo.com/bar",
+          "labels": [
+            {
+              "name": "version",
+              "value": "1.0.0"
+            },
+            {
+              "name": "arch",
+              "value": "s390x"
+            },
+            {
+              "name": "os",
+              "value": "linux"
+            }
+          ],
+          "annotations": [
+            {
+              "name": "created",
+              "value": "1438983392"
+            }
+          ]
+        })~").get();
+    #else
     return JSON::parse(
         R"~(
         {
@@ -238,6 +376,7 @@ protected:
             }
           ]
         })~").get();
+    #endif
   }
 };
 
@@ -684,6 +823,37 @@ protected:
         stringify(server.self().address.ip),
         server.self().address.port).get();
 
+    #if defined(__s390x__)
+    const string manifest = strings::format(
+        R"~(
+        {
+          "acKind": "ImageManifest",
+            "acVersion": "0.6.1",
+            "name": "%s",
+            "labels": [
+            {
+              "name": "version",
+              "value": "latest"
+            },
+            {
+              "name": "arch",
+              "value": "s390x"
+            },
+            {
+              "name": "os",
+              "value": "linux"
+            }
+          ],
+            "annotations": [
+            {
+              "name": "created",
+              "value": "1438983392"
+            }
+          ]
+        })~",
+        imageName).get();
+
+    #else
     const string manifest = strings::format(
         R"~(
         {
@@ -712,6 +882,7 @@ protected:
           ]
         })~",
         imageName).get();
+    #endif
 
     return JSON::parse(manifest).get();
   }
@@ -764,9 +935,11 @@ protected:
 TEST_F(AppcImageFetcherTest, CURL_SimpleHttpFetch)
 {
   const string imageName = "image";
-
+  #if defined(__s390x__)
+  const string imageBundleName = imageName + "-latest-linux-s390x.aci";
+  #else
   const string imageBundleName = imageName + "-latest-linux-amd64.aci";
-
+  #endif
   // Use the default server directory of the image server.
   const Path serverDir(path::join(os::getcwd(), "server"));
   const string imageBundlePath = path::join(serverDir, imageBundleName);
@@ -831,9 +1004,11 @@ TEST_F(AppcImageFetcherTest, CURL_SimpleHttpFetch)
 TEST_F(AppcImageFetcherTest, SimpleFileFetch)
 {
   const string imageName = "image";
-
+  #if defined(__s390x__)
+  const string imageBundleName = imageName + "-latest-linux-s390x.aci";
+  #else
   const string imageBundleName = imageName + "-latest-linux-amd64.aci";
-
+  #endif
   // This represents the directory where images volume could be mounted.
   const string imageDirMountPath(path::join(os::getcwd(), "mnt"));
 
@@ -897,6 +1072,43 @@ protected:
   void prepareImageBundle(const string& imageName, const string& mntDir)
   {
     // TODO(jojy): Consider parameterizing the labels for image name decoration.
+    #if defined(__s390x__)
+    const string imageBundleName = imageName + "-latest-linux-s390x.aci";
+
+    const string imagesPath = path::join(mntDir, "images");
+    const string imagePath = path::join(imagesPath, imageBundleName);
+
+    const string manifest = strings::format(
+        R"~(
+        {
+          "acKind": "ImageManifest",
+            "acVersion": "0.6.1",
+            "name": "%s",
+            "labels": [
+            {
+              "name": "version",
+              "value": "latest"
+            },
+            {
+              "name": "arch",
+              "value": "s390x"
+            },
+            {
+              "name": "os",
+              "value": "linux"
+            }
+          ],
+            "annotations": [
+            {
+              "name": "created",
+              "value": "1438983392"
+            }
+          ]
+        })~",
+        imageName).get();
+
+    #else
+
     const string imageBundleName = imageName + "-latest-linux-amd64.aci";
 
     const string imagesPath = path::join(mntDir, "images");
@@ -930,6 +1142,8 @@ protected:
           ]
         })~",
         imageName).get();
+
+    #endif
 
     const string rootfsPath = path::join(imagePath, "rootfs");
 
