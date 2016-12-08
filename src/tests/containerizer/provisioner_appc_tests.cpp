@@ -83,10 +83,17 @@ namespace tests {
  * @param os Operating system(e.g, linux).
  * @return Appc protobuff message object.
  */
+#if defined(__s390x__)
+static Image::Appc getAppcImage(
+    const string& name,
+    const string& arch = "s390x",
+    const string& os = "linux")
+#else 
 static Image::Appc getAppcImage(
     const string& name,
     const string& arch = "amd64",
     const string& os = "linux")
+#endif 
 {
   Image::Appc appc;
   appc.set_name(name);
@@ -115,6 +122,36 @@ class AppcSpecTest : public TemporaryDirectoryTest {};
 
 TEST_F(AppcSpecTest, ValidateImageManifest)
 {
+  #if defined(__s390x__)
+  JSON::Value manifest = JSON::parse(
+      "{"
+      "  \"acKind\": \"ImageManifest\","
+      "  \"acVersion\": \"0.6.1\","
+      "  \"name\": \"foo.com/bar\","
+      "  \"labels\": ["
+      "    {"
+      "      \"name\": \"version\","
+      "      \"value\": \"1.0.0\""
+      "    },"
+      "    {"
+      "      \"name\": \"arch\","
+      "      \"value\": \"s390x\""
+      "    },"
+      "    {"
+      "      \"name\": \"os\","
+      "      \"value\": \"linux\""
+      "    }"
+      "  ],"
+      "  \"annotations\": ["
+      "    {"
+      "      \"name\": \"created\","
+      "      \"value\": \"1438983392\""
+      "    }"
+      "  ]"
+      "}").get();
+
+  #else
+
   JSON::Value manifest = JSON::parse(
       "{"
       "  \"acKind\": \"ImageManifest\","
@@ -141,6 +178,8 @@ TEST_F(AppcSpecTest, ValidateImageManifest)
       "    }"
       "  ]"
       "}").get();
+
+  #endif 
 
   EXPECT_SOME(spec::parse(stringify(manifest)));
 
@@ -259,7 +298,12 @@ protected:
 
     Label arch;
     arch.set_key("arch");
+
+    #if defined(__s390x__)
+    arch.set_value("s390x");
+    #else
     arch.set_value("amd64");
+    #endif 
 
     Label os;
     os.set_key("os");
@@ -279,6 +323,37 @@ protected:
   // ability for customizing manifests for fixtures.
   virtual JSON::Value getManifest() const
   {
+    #if defined(__s390x__)
+    return JSON::parse(
+        R"~(
+        {
+          "acKind": "ImageManifest",
+          "acVersion": "0.6.1",
+          "name": "foo.com/bar",
+          "labels": [
+            {
+              "name": "version",
+              "value": "1.0.0"
+            },
+            {
+              "name": "arch",
+              "value": "s390x"
+            },
+            {
+              "name": "os",
+              "value": "linux"
+            }
+          ],
+          "annotations": [
+            {
+              "name": "created",
+              "value": "1438983392"
+            }
+          ]
+        })~").get();
+
+    #else
+
     return JSON::parse(
         R"~(
         {
@@ -306,6 +381,8 @@ protected:
             }
           ]
         })~").get();
+
+    #endif 
   }
 };
 
@@ -555,6 +632,38 @@ protected:
         stringify(server.self().address.ip),
         server.self().address.port).get();
 
+    #if defined(__s390x__)
+    const string manifest = strings::format(
+        R"~(
+        {
+          "acKind": "ImageManifest",
+            "acVersion": "0.6.1",
+            "name": "%s",
+            "labels": [
+            {
+              "name": "version",
+              "value": "latest"
+            },
+            {
+              "name": "arch",
+              "value": "s390x"
+            },
+            {
+              "name": "os",
+              "value": "linux"
+            }
+          ],
+            "annotations": [
+            {
+              "name": "created",
+              "value": "1438983392"
+            }
+          ]
+        })~",
+        imageName).get();
+
+    #else
+
     const string manifest = strings::format(
         R"~(
         {
@@ -583,6 +692,8 @@ protected:
           ]
         })~",
         imageName).get();
+
+    #endif 
 
     return JSON::parse(manifest).get();
   }
@@ -636,7 +747,11 @@ TEST_F(AppcImageFetcherTest, CURL_SimpleHttpFetch)
 {
   const string imageName = "image";
 
+  #if defined(__s390x__)
+  const string imageBundleName = imageName + "-latest-linux-s390x.aci";
+  #else
   const string imageBundleName = imageName + "-latest-linux-amd64.aci";
+  #endif
 
   // Use the default server directory of the image server.
   const Path serverDir(path::join(os::getcwd(), "server"));
@@ -703,7 +818,11 @@ TEST_F(AppcImageFetcherTest, SimpleFileFetch)
 {
   const string imageName = "image";
 
+  #if defined(__s390x__)
+  const string imageBundleName = imageName + "-latest-linux-s390x.aci";
+  #else
   const string imageBundleName = imageName + "-latest-linux-amd64.aci";
+  #endif
 
   // This represents the directory where images volume could be mounted.
   const string imageDirMountPath(path::join(os::getcwd(), "mnt"));
@@ -768,6 +887,43 @@ protected:
   void prepareImageBundle(const string& imageName, const string& mntDir)
   {
     // TODO(jojy): Consider parameterizing the labels for image name decoration.
+    #if defined(__s390x__)
+    const string imageBundleName = imageName + "-latest-linux-s390x.aci";
+
+    const string imagesPath = path::join(mntDir, "images");
+    const string imagePath = path::join(imagesPath, imageBundleName);
+
+    const string manifest = strings::format(
+        R"~(
+        {
+          "acKind": "ImageManifest",
+            "acVersion": "0.6.1",
+            "name": "%s",
+            "labels": [
+            {
+              "name": "version",
+              "value": "latest"
+            },
+            {
+              "name": "arch",
+              "value": "s390x"
+            },
+            {
+              "name": "os",
+              "value": "linux"
+            }
+          ],
+            "annotations": [
+            {
+              "name": "created",
+              "value": "1438983392"
+            }
+          ]
+        })~",
+        imageName).get();
+
+    #else
+    
     const string imageBundleName = imageName + "-latest-linux-amd64.aci";
 
     const string imagesPath = path::join(mntDir, "images");
@@ -801,6 +957,8 @@ protected:
           ]
         })~",
         imageName).get();
+
+    #endif
 
     const string rootfsPath = path::join(imagePath, "rootfs");
 

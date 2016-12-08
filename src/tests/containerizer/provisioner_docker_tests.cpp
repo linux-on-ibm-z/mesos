@@ -448,7 +448,12 @@ TEST_F(ProvisionerDockerPullerTest, ROOT_INTERNET_CURL_SimpleCommand)
 
   Image image;
   image.set_type(Image::DOCKER);
+
+  #if defined(__s390x__)
+  image.mutable_docker()->set_name("s390x/debian");
+  #else
   image.mutable_docker()->set_name("library/alpine");
+  #endif
 
   ContainerInfo* container = task.mutable_container();
   container->set_type(ContainerInfo::MESOS);
@@ -523,7 +528,12 @@ TEST_F(ProvisionerDockerPullerTest, ROOT_INTERNET_CURL_Normalize)
 
   Image image;
   image.set_type(Image::DOCKER);
+
+  #if defined(__s390x__)
+  image.mutable_docker()->set_name("s390x/debian");
+  #else 
   image.mutable_docker()->set_name("alpine");
+  #endif
 
   ContainerInfo* container = task.mutable_container();
   container->set_type(ContainerInfo::MESOS);
@@ -602,7 +612,12 @@ TEST_F(ProvisionerDockerPullerTest, ROOT_INTERNET_CURL_Whiteout)
 
   Image image;
   image.set_type(Image::DOCKER);
+
+  #if defined(__s390x__)
+  image.mutable_docker()->set_name("s390x/debian");
+  #else 
   image.mutable_docker()->set_name("cirros");
+  #endif 
 
   ContainerInfo* container = task.mutable_container();
   container->set_type(ContainerInfo::MESOS);
