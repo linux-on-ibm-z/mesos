@@ -396,7 +396,7 @@ TEST_F(HealthCheckTest, ROOT_HealthyTaskWithContainerImage)
   slave::Flags agentFlags = CreateSlaveFlags();
   agentFlags.isolation = "docker/runtime,filesystem/linux";
   agentFlags.image_providers = "docker";
-  agentFlags.docker_registry = directory;
+  agentFlags.docker_registry = "/opt/docker/images";
   agentFlags.docker_store_dir = path::join(os::getcwd(), "store");
 
   Owned<MasterDetector> detector = master.get()->createDetector();

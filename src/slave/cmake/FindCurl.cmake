@@ -51,7 +51,10 @@ find_path(CURL_INCLUDE_DIR curl.h ${POSSIBLE_CURL_INCLUDE_DIRS})
 set(POSSIBLE_CURL_LIB_DIRS
   ${POSSIBLE_CURL_LIB_DIRS}
   /usr/lib
-  /usr/lib/x86_64-linux-gnu
+  /usr/lib,
+  /usr/lib64,
+  /lib,
+  /lib64/,
   /usr/local/lib
   )
 
